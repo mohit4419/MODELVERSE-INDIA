@@ -1,0 +1,6 @@
+{
+  "name": "ModelVerse India",
+  "description": "A premium SaaS platform for professional model discovery, talent booking, and creator marketplace across India designed with Airbnb-style experience.",
+  "requestFramePermissions": ["camera", "microphone", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

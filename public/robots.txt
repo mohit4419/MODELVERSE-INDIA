@@ -1,0 +1,10 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+
+# Exclude sensitive dashboard routes or user settings if any (standard security SEO best-practice)
+Disallow: /admin/
+Disallow: /settings/
+Disallow: /api/
+
+Sitemap: https://modelverse.in/sitemap.xml
