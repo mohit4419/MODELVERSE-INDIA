@@ -1075,7 +1075,7 @@ export default function App() {
   const filterKey = `${searchLocation}-${searchCategory}-${searchGender}-${searchAgeRange.join(',')}-${searchHeightClass}-${searchExperience}-${searchBudgetLimit}-${searchOnlyVerified}-${searchAvailableOnly}-${searchRadius}-${searchQuery}-${sortBy}`;
 
   // BOOKING WIZARD SUBMIT REQUEST
-  const handleBookingSubmit = (bookingData: any) => {
+  const handleBookingSubmit = async (bookingData: any) => {
     const freshBooking: Booking = {
       id: `bk_${Date.now()}`,
       clientId,
@@ -1099,97 +1099,46 @@ export default function App() {
     );
 
     // Call API to create payment checkout session
-    fetch('/api/payments/create-session', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        gateway: 'Razorpay', // Default fallback gateway
-        planType: 'escrow',
-        userId: clientId,
-        userName: currentUserName || 'Premium Agency (Test Client)',
-        userEmail: userEmail,
-        modelId: freshBooking.modelId,
-        modelName: freshBooking.modelName,
-        amount: freshBooking.priceAmount
-      }),
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error('Network error preparing secure checkout session.');
-        return res.json();
-      })
-      .then(async (data) => {
-        if (data && data.isReal) {
-          // If real Razorpay integration is present, load checkouts dynamically
-          const loadScript = () => {
-            return new Promise((resolve) => {
-              if ((window as any).Razorpay) {
-                resolve(true);
-                return;
-              }
-              const script = document.createElement('script');
-              script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-              script.onload = () => resolve(true);
-              script.onerror = () => resolve(false);
-              document.body.appendChild(script);
-            });
-          };
+    
 
-          const isLoaded = await loadScript();
-          if (!isLoaded) {
-            throw new Error('Could not load Razorpay Payment Gateway SDK in your browser.');
-          }
+const {
+  data: { session },
+} = await supabase.auth.getSession();
 
-          const options = {
-            key: data.keyId || "rzp_live_T98SGPXDdLJMsz",
-            amount: data.amount,
-            currency: data.currency || "INR",
-            name: 'ModelVerse India',
-            description: `Casting Campaign Escrow - ${freshBooking.modelName}`,
-            image: "https://example.com/your_logo",
-            order_id: data.id,
-            handler: function (res: any) {
-              const { razorpay_payment_id, razorpay_order_id, razorpay_signature } = res;
-              const origin = window.location.origin;
-              window.location.href = `${origin}/?payment_success=true&gateway=Razorpay&session_id=${razorpay_order_id}&plan_type=escrow&user_id=${clientId || ''}&amount=${freshBooking.priceAmount}&model_id=${freshBooking.modelId}&model_name=${encodeURIComponent(freshBooking.modelName)}&razorpay_payment_id=${razorpay_payment_id}&razorpay_order_id=${razorpay_order_id}&razorpay_signature=${razorpay_signature}`;
-            },
-            prefill: {
-              name: currentUserName || 'Premium Client',
-              email: userEmail || 'client@advertiser.com',
-              contact: '9999999999'
-            },
-            theme: {
-              color: '#EA3838'
-            },
-            modal: {
-              ondismiss: function() {
-                console.log('Razorpay booking payment dismissed');
-              }
-            }
-          };
+const { data, error } = await supabase.functions.invoke("create-order", {
+  headers: {
+    Authorization: `Bearer ${session?.access_token}`,
+  },
+  body: {
+    model_id: selectedModel.id, // replace with your model ID variable
+  },
+});
 
-          const rzp = new (window as any).Razorpay(options);
-          rzp.open();
-          setShowBookingWizard(false);
-        } else if (data && data.url) {
-          // Close Booking Wizard and redirect browser to secure payment session URL
-          setShowBookingWizard(false);
-          window.location.href = data.url;
-        } else {
-          throw new Error('No checkout URL or session metadata returned by secure gateway.');
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to initiate escrow checkout:', err);
-        triggerToast(
-          'Payment Gateway Error',
-          'Failed to connect to the secure payment server. Please try again.',
-          'error'
-        );
-      });
-  };
+if (error) {
+  console.error(error);
+  throw new Error("Unable to create Razorpay order");
+}
 
+const order = data;
+
+// Razorpay checkout
+const options = {
+  key: order.key,
+  amount: order.amount,
+  currency: order.currency,
+  order_id: order.order_id,
+  name: "ModelVerse India",
+  description: "Model Booking",
+  handler: async function (response: any) {
+    console.log(response);
+    // Call your payment verification here
+  },
+};
+
+const razorpay = new (window as any).Razorpay(options);
+razorpay.open();
+    
+     
   // SEND MESSAGE CALLBACK IN CHAT PANEL
   const handleSendMessage = (content: string, imageUrl?: string, sendAsModel = false) => {
     if (!chatModelUserId) return;
