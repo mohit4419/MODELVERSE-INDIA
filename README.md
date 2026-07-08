@@ -10,11 +10,25 @@ View your app in AI Studio: https://ai.studio/apps/68e1fcea-3a62-413a-94a6-0ea7b
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
-
+**Prerequisites:** Node.js
 
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
+2. Copy the example environment file:
+   `cp .env.example .env`
+3. Edit `.env` and set the following values:
+   - `GEMINI_API_KEY`
+   - `APP_URL`
+   - `FRONTEND_URL`
+   - `JWT_SECRET`
+   - `COOKIE_SECRET`
+   - `GOOGLE_MAPS_PLATFORM_KEY` or `VITE_GOOGLE_MAPS_PLATFORM_KEY`
+   - `RAZORPAY_KEY_ID`
+   - `RAZORPAY_KEY_SECRET`
+   - `SUPABASE_URL`
+   - `VITE_SUPABASE_URL`
+   - `SUPABASE_API_KEY` or `VITE_SUPABASE_API_KEY`
+   - `SUPABASE_PUBLISHABLE_KEY`
+   - `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY`
+4. Run the app:
    `npm run dev`

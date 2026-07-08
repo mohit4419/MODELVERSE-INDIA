@@ -401,7 +401,7 @@ export default function ModelCard({
               <h4 className="font-sans text-md font-bold tracking-tight text-[#0F0F0F] dark:text-neutral-100 dark:group-hover:text-purple-400 group-hover:text-purple-600 transition-colors flex items-center gap-1">
                 {model.name}
                 {model.approved && (
-                  <CheckCircle2 className="h-4.5 w-4.5 fill-[#D4AF37] text-white" title="ModelVerse India Approved Agent" />
+                  <CheckCircle2 className="h-4.5 w-4.5 fill-[#D4AF37] text-white" aria-label="ModelVerse India Approved Agent" />
                 )}
               </h4>
               {isAuthenticated && getAvailabilityBadge(model.availabilityStatus)}

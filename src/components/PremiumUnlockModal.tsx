@@ -21,6 +21,10 @@ interface PremiumUnlockModalProps {
   userEmail?: string;
 }
 
+type PaymentStep = 'details' | 'initializing' | 'upi_qr' | 'processing' | 'success';
+
+type PaymentGateway = 'UPI' | 'Razorpay' | 'Cashfree' | 'ReservePay';
+
 export default function PremiumUnlockModal({
   model,
   isOpen,
@@ -31,8 +35,8 @@ export default function PremiumUnlockModal({
   userName = 'Guest User',
   userEmail = 'guest@modelverse.in'
 }: PremiumUnlockModalProps) {
-  const [paymentStep, setPaymentStep] = useState<'details' | 'initializing' | 'upi_qr' | 'processing' | 'success'>('details');
-  const [gateway, setGateway] = useState<'UPI' | 'Razorpay' | 'Cashfree' | 'ReservePay'>('Razorpay');
+  const [paymentStep, setPaymentStep] = useState<PaymentStep>('details' as PaymentStep);
+  const [gateway, setGateway] = useState<PaymentGateway>('Razorpay');
   const [utr, setUtr] = useState('');
   const [utrError, setUtrError] = useState('');
   const [paymentError, setPaymentError] = useState('');
@@ -49,6 +53,8 @@ export default function PremiumUnlockModal({
   }, []);
 
   if (!isOpen) return null;
+
+  const isPaymentProcessing = (paymentStep as PaymentStep) === 'initializing' || (paymentStep as PaymentStep) === 'processing';
 
   const handlePaySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,14 +116,13 @@ export default function PremiumUnlockModal({
         }
 
         const options = {
-          key: data.keyId || "rzp_live_T98SGPXDdLJMsz", // Enter the Key ID generated from the Dashboard
-          amount: data.amount || "50000", // Amount is in currency subunits. 
+          key: data.keyId,
+          amount: data.amount,
           currency: data.currency || "INR",
-          name: 'ModelVerse India', // your business name
+          name: 'ModelVerse India',
           description: planType === 'enterprise' ? 'Enterprise Agency License' : `Test Transaction - ${model.name}`,
           image: "https://example.com/your_logo",
-          order_id: data.id || "order_9A33XWu170gUtm", // This is a sample Order ID. Pass the `id` obtained in the response of Step 1
-          callback_url: "https://eneqd3r9zrjok.x.pipedream.net/",
+          order_id: data.id,
           handler: function (res: any) {
             try {
               alert(res.razorpay_payment_id);
@@ -425,10 +430,10 @@ export default function PremiumUnlockModal({
                 <button
                   type="submit"
                   id="rzp-button1"
-                  disabled={paymentStep === 'initializing' || paymentStep === 'processing'}
+                  disabled={isPaymentProcessing}
                   className="w-full px-4 py-2 text-sm bg-purple-700 hover:bg-purple-800 disabled:opacity-50 disabled:cursor-wait text-white font-black uppercase tracking-wider rounded-full shadow-md transition active:scale-98 flex items-center justify-center space-x-1.5 cursor-pointer"
                 >
-                  {paymentStep === 'initializing' || paymentStep === 'processing' ? (
+                  {isPaymentProcessing ? (
                     <>
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       <span>Processing Transaction...</span>

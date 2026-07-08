@@ -10,14 +10,14 @@ const envUrl =
   (import.meta.env?.VITE_SUPABASE_URL) || 
   (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_URL) || 
   (typeof process !== 'undefined' && process.env?.SUPABASE_URL) || 
-  "https://azffjicefmbamgfcgkbg.supabase.co";
+  '';
 
 const envKey = 
   (import.meta.env?.VITE_SUPABASE_API_KEY) || 
   (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_API_KEY) || 
   (typeof process !== 'undefined' && process.env?.SUPABASE_API_KEY) || 
   (typeof process !== 'undefined' && process.env?.SUPABASE_PUBLISHABLE_KEY) || 
-  "sb_publishable_X2GIhIwel60_QNixrGNYuw_wI7HCsOx";
+  '';
 
 const getCleanUrl = (url) => {
   if (!url) return '';

@@ -611,7 +611,7 @@ export default function ProfileView({
             <div className="flex flex-wrap items-center gap-2 mt-2">
               <h2 className="font-sans text-3xl font-black tracking-tight text-[#0F0F0F] flex items-center gap-1.5">
                 {model.name}
-                {model.approved && <CheckCircle2 className="h-6 w-6 fill-[#D4AF37] text-white" title="Casted Approved" />}
+                {model.approved && <CheckCircle2 className="h-6 w-6 fill-[#D4AF37] text-white" aria-label="Casted Approved" />}
               </h2>
               {(() => {
                 const s = model.availabilityStatus || 'Available';

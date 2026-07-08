@@ -39,7 +39,7 @@ import BannerAd from './components/BannerAd';
 import { calculateHaversineDistance, getCityCoordinates } from './utils/location';
 
 import { Sparkles, Star, MapPin, Heart, ShieldAlert, CheckCircle2, MessageCircle, DollarSign, Calendar, Flame, Instagram, X, MessageSquare, Clock, User as UserIcon, LogIn, UserPlus, Search, Sun, Moon, LifeBuoy, SlidersHorizontal } from 'lucide-react';
-import { motion, useScroll, useSpring, animate, AnimatePresence } from 'motion/react';
+import { motion, useScroll, useSpring, animate, AnimatePresence, type Variants } from 'motion/react';
 
 const HOME_CATEGORY_DESCRIPTIONS: Record<string, string> = {
   'all': 'Explore our complete, premium registry of models, influencers, and actors available across India.',
@@ -54,7 +54,7 @@ const HOME_CATEGORY_DESCRIPTIONS: Record<string, string> = {
   'Brand Ambassadors': 'Long-term corporate figures, exclusive campaign faces, and signature runway personalities.'
 };
 
-const marketplaceGridVariants = {
+const marketplaceGridVariants: Variants = {
   hidden: { opacity: 0 },
   show: {
     opacity: 1,
@@ -64,13 +64,13 @@ const marketplaceGridVariants = {
   },
 };
 
-const marketplaceItemVariants = {
+const marketplaceItemVariants: Variants = {
   hidden: { opacity: 0, y: 15 },
   show: {
     opacity: 1,
     y: 0,
     transition: {
-      type: 'spring',
+      type: 'spring' as const,
       stiffness: 100,
       damping: 14,
     },
@@ -1099,46 +1099,44 @@ export default function App() {
     );
 
     // Call API to create payment checkout session
-    
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-const {
-  data: { session },
-} = await supabase.auth.getSession();
+    const { data, error } = await supabase.functions.invoke("create-order", {
+      headers: {
+        Authorization: `Bearer ${session?.access_token}`,
+      },
+      body: {
+        model_id: bookingData.modelId,
+      },
+    });
 
-const { data, error } = await supabase.functions.invoke("create-order", {
-  headers: {
-    Authorization: `Bearer ${session?.access_token}`,
-  },
-  body: {
-    model_id: selectedModel.id, // replace with your model ID variable
-  },
-});
+    if (error) {
+      console.error(error);
+      throw new Error("Unable to create Razorpay order");
+    }
 
-if (error) {
-  console.error(error);
-  throw new Error("Unable to create Razorpay order");
-}
+    const order = data;
 
-const order = data;
+    // Razorpay checkout
+    const options = {
+      key: order.key,
+      amount: order.amount,
+      currency: order.currency,
+      order_id: order.order_id,
+      name: "ModelVerse India",
+      description: "Model Booking",
+      handler: async function (response: any) {
+        console.log(response);
+        // Call your payment verification here
+      },
+    };
 
-// Razorpay checkout
-const options = {
-  key: order.key,
-  amount: order.amount,
-  currency: order.currency,
-  order_id: order.order_id,
-  name: "ModelVerse India",
-  description: "Model Booking",
-  handler: async function (response: any) {
-    console.log(response);
-    // Call your payment verification here
-  },
-};
+    const razorpay = new (window as any).Razorpay(options);
+    razorpay.open();
+  };
 
-const razorpay = new (window as any).Razorpay(options);
-razorpay.open();
-    
-     
   // SEND MESSAGE CALLBACK IN CHAT PANEL
   const handleSendMessage = (content: string, imageUrl?: string, sendAsModel = false) => {
     if (!chatModelUserId) return;
