@@ -1,9 +1,51 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import { createClient } from '@supabase/supabase-js';
 import { Request, Response, NextFunction } from 'express';
 
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
+const supabaseUrl =
+  process.env.SUPABASE_URL?.trim() ||
+  process.env.VITE_SUPABASE_URL?.trim() ||
+  "";
 // On the server, we prefer the Secret/Service Key for admin/secure tasks, but can fallback to the Publishable/Anon key
-const supabaseKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_API_KEY || '';
+const supabaseKey =
+  process.env.SUPABASE_SECRET_KEY?.trim() ||
+  process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
+  process.env.SUPABASE_ANON_KEY?.trim() ||
+  process.env.SUPABASE_PUBLISHABLE_KEY?.trim() ||
+  process.env.VITE_SUPABASE_API_KEY?.trim() ||
+  "";
+console.log("===== SUPABASE ENV CHECK =====");
+console.log("SUPABASE_URL:", process.env.SUPABASE_URL);
+console.log("VITE_SUPABASE_URL:", process.env.VITE_SUPABASE_URL);
+
+console.log(
+  "SUPABASE_SECRET_KEY:",
+  process.env.SUPABASE_SECRET_KEY ? "FOUND" : "MISSING"
+);
+
+console.log(
+  "SUPABASE_SERVICE_ROLE_KEY:",
+  process.env.SUPABASE_SERVICE_ROLE_KEY ? "FOUND" : "MISSING"
+);
+
+console.log(
+  "SUPABASE_PUBLISHABLE_KEY:",
+  process.env.SUPABASE_PUBLISHABLE_KEY ? "FOUND" : "MISSING"
+);
+
+console.log(
+  "SUPABASE_ANON_KEY:",
+  process.env.SUPABASE_ANON_KEY ? "FOUND" : "MISSING"
+);
+
+console.log(
+  "VITE_SUPABASE_API_KEY:",
+  process.env.VITE_SUPABASE_API_KEY ? "FOUND" : "MISSING"
+);
+
+console.log("==============================");
 
 export let supabaseAdmin: any = null;
 export let isSupabaseConfigured = false;
