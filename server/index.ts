@@ -1271,7 +1271,7 @@ app.get('/sitemap.xml', async (req: Request, res: Response) => {
   }
 });
 
-// Supabase Server Integration API Routes
+
 
 app.get('/api/supabase/status', (req: Request, res: Response) => {
   return res.json({
