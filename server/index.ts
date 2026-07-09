@@ -1271,14 +1271,23 @@ app.get('/sitemap.xml', async (req: Request, res: Response) => {
   }
 });
 
-
 // Supabase Server Integration API Routes
+
 app.get('/api/supabase/status', (req: Request, res: Response) => {
   return res.json({
     isConfigured: isSupabaseConfigured,
     url: process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL ? 'Configured' : 'Missing',
-    hasSecretKey: !!process.env.SUPABASE_SECRET_KEY,
-    hasPublishableKey: !!process.env.SUPABASE_PUBLISHABLE_KEY || !!process.env.VITE_SUPABASE_API_KEY
+
+    hasSecretKey: !!(
+      process.env.SUPABASE_SECRET_KEY ||
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    ),
+
+    hasPublishableKey: !!(
+      process.env.SUPABASE_PUBLISHABLE_KEY ||
+      process.env.VITE_SUPABASE_ANON_KEY ||
+      process.env.VITE_SUPABASE_API_KEY
+    )
   });
 });
 
