@@ -1708,6 +1708,7 @@ app.get(['/oauth-callback', '/oauth-callback/'], (req: Request, res: Response) =
   `);
 });
 
+
 async function startServer() {
   // Register secure centralized error handling middleware
   app.use(errorHandler);
