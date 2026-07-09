@@ -1,30 +1,28 @@
 import { createClient } from "@supabase/supabase-js";
 
-// ==========================================
-// SUPABASE CONFIGURATION
-// Replace the values below with your actual
-// Supabase Project URL and Anon/Public Key.
-// ==========================================
+const SUPABASE_URL =
+  import.meta.env.VITE_SUPABASE_URL ||
+  process.env.SUPABASE_URL ||
+  "";
 
-const envUrl = 
-  (import.meta.env?.VITE_SUPABASE_URL) || 
-  (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_URL) || 
-  (typeof process !== 'undefined' && process.env?.SUPABASE_URL) || 
-  '';
+const SUPABASE_PUBLIC_KEY =
+  import.meta.env.VITE_SUPABASE_API_KEY ||
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  process.env.SUPABASE_API_KEY ||
+  process.env.SUPABASE_PUBLISHABLE_KEY ||
+  process.env.VITE_SUPABASE_API_KEY ||
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  "";
 
-const envKey = 
-  (import.meta.env?.VITE_SUPABASE_API_KEY) || 
-  (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_API_KEY) || 
-  (typeof process !== 'undefined' && process.env?.SUPABASE_API_KEY) || 
-  (typeof process !== 'undefined' && process.env?.SUPABASE_PUBLISHABLE_KEY) || 
-  '';
+if (!SUPABASE_URL) {
+  console.error("❌ SUPABASE_URL is missing.");
+}
 
-const getCleanUrl = (url) => {
-  if (!url) return '';
-  return url.trim().replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
-};
+if (!SUPABASE_PUBLIC_KEY) {
+  console.error("❌ SUPABASE_PUBLIC_KEY / PUBLISHABLE_KEY is missing.");
+}
 
-const SUPABASE_URL = getCleanUrl(envUrl);
-const SUPABASE_PUBLIC_KEY = envKey.trim();
-
-export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLIC_KEY);
+export const supabase = createClient(
+  SUPABASE_URL.replace(/\/$/, ""),
+  SUPABASE_PUBLIC_KEY
+);
