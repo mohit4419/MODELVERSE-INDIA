@@ -4,6 +4,10 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
     for (let key of __getOwnPropNames(from))
@@ -20,35 +24,269 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
   mod
 ));
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // server/index.ts
+var index_exports = {};
+__export(index_exports, {
+  generateSalt: () => generateSalt,
+  hashPassword: () => hashPassword,
+  validatePhoneNumber: () => validatePhoneNumber
+});
+module.exports = __toCommonJS(index_exports);
+var import_dotenv2 = __toESM(require("dotenv"), 1);
 var import_express = __toESM(require("express"), 1);
 var import_path = __toESM(require("path"), 1);
 var import_fs = __toESM(require("fs"), 1);
 var import_vite = require("vite");
 var import_genai = require("@google/genai");
-var import_dotenv = __toESM(require("dotenv"), 1);
 var import_resvg_js = require("@resvg/resvg-js");
 var import_http = __toESM(require("http"), 1);
-var import_ws = require("ws");
+var import_ws = __toESM(require("ws"), 1);
+var import_morgan = __toESM(require("morgan"), 1);
+var import_bcrypt = __toESM(require("bcrypt"), 1);
 var import_razorpay = __toESM(require("razorpay"), 1);
 var import_crypto = __toESM(require("crypto"), 1);
+
+// server/supabase.ts
+var import_dotenv = __toESM(require("dotenv"), 1);
+var import_supabase_js = require("@supabase/supabase-js");
 import_dotenv.default.config();
+var supabaseUrl = process.env.SUPABASE_URL?.trim() || process.env.VITE_SUPABASE_URL?.trim() || "";
+var supabaseKey = process.env.SUPABASE_SECRET_KEY?.trim() || process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || process.env.SUPABASE_ANON_KEY?.trim() || process.env.SUPABASE_PUBLISHABLE_KEY?.trim() || process.env.VITE_SUPABASE_API_KEY?.trim() || "";
+console.log("===== SUPABASE ENV CHECK =====");
+console.log("SUPABASE_URL:", process.env.SUPABASE_URL);
+console.log("VITE_SUPABASE_URL:", process.env.VITE_SUPABASE_URL);
+console.log(
+  "SUPABASE_SECRET_KEY:",
+  process.env.SUPABASE_SECRET_KEY ? "FOUND" : "MISSING"
+);
+console.log(
+  "SUPABASE_SERVICE_ROLE_KEY:",
+  process.env.SUPABASE_SERVICE_ROLE_KEY ? "FOUND" : "MISSING"
+);
+console.log(
+  "SUPABASE_PUBLISHABLE_KEY:",
+  process.env.SUPABASE_PUBLISHABLE_KEY ? "FOUND" : "MISSING"
+);
+console.log(
+  "SUPABASE_ANON_KEY:",
+  process.env.SUPABASE_ANON_KEY ? "FOUND" : "MISSING"
+);
+console.log(
+  "VITE_SUPABASE_API_KEY:",
+  process.env.VITE_SUPABASE_API_KEY ? "FOUND" : "MISSING"
+);
+console.log("==============================");
+var supabaseAdmin = null;
+var isSupabaseConfigured = false;
+if (supabaseUrl && supabaseKey) {
+  try {
+    supabaseAdmin = (0, import_supabase_js.createClient)(supabaseUrl, supabaseKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false
+      }
+    });
+    isSupabaseConfigured = true;
+    console.log("[Supabase Server] Successfully initialized Supabase admin client.");
+  } catch (err) {
+    console.error("[Supabase Server] Failed to initialize Supabase admin client:", err);
+  }
+} else {
+  console.warn("[Supabase Server] Missing SUPABASE_URL or SUPABASE_SECRET_KEY/PUBLISHABLE_KEY. Server-side Supabase is disabled or in fallback mode.");
+}
+async function requireSupabaseAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Unauthorized: Missing or invalid Authorization header" });
+  }
+  const token = authHeader.split(" ")[1];
+  if (!token) {
+    return res.status(401).json({ error: "Unauthorized: Token not provided" });
+  }
+  if (!isSupabaseConfigured || !supabaseAdmin) {
+    return res.status(503).json({ error: "Service Unavailable: Supabase server is not configured" });
+  }
+  try {
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    if (error || !user) {
+      return res.status(401).json({ error: "Unauthorized: Invalid Supabase token", details: error?.message });
+    }
+    req.user = user;
+    req.supabaseToken = token;
+    next();
+  } catch (err) {
+    console.error("[Supabase Server] Auth verification error:", err);
+    return res.status(500).json({ error: "Internal Server Error during auth verification", details: err.message });
+  }
+}
+
+// server/middleware/security.ts
+var import_helmet = __toESM(require("helmet"), 1);
+var import_cors = __toESM(require("cors"), 1);
+var import_compression = __toESM(require("compression"), 1);
+var import_express_rate_limit = __toESM(require("express-rate-limit"), 1);
+var import_hpp = __toESM(require("hpp"), 1);
+var import_cookie_parser = __toESM(require("cookie-parser"), 1);
+var import_xss_clean = __toESM(require("xss-clean"), 1);
+function setupSecurityMiddlewares(app2) {
+  app2.use((0, import_helmet.default)({
+    contentSecurityPolicy: false,
+    // Turn off CSP if we need to let the iframe or external assets load smoothly
+    crossOriginEmbedderPolicy: false
+  }));
+  const allowedOrigin = process.env.FRONTEND_URL || process.env.APP_URL || "http://localhost:3000";
+  app2.use((0, import_cors.default)({
+    origin: (origin, callback) => {
+      if (!origin || origin === allowedOrigin || allowedOrigin.includes(origin) || origin.includes("localhost") || origin.includes("run.app")) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+  }));
+  app2.use((0, import_hpp.default)());
+  app2.use((0, import_xss_clean.default)());
+  app2.use((0, import_compression.default)());
+  const cookieSecret = process.env.COOKIE_SECRET || "default_cookie_secret_signing_key_12345";
+  app2.use((0, import_cookie_parser.default)(cookieSecret));
+  const apiLimiter = (0, import_express_rate_limit.default)({
+    windowMs: 15 * 60 * 1e3,
+    // 15 minutes
+    max: 200,
+    // Limit each IP to 200 requests per window
+    standardHeaders: true,
+    // Return rate limit info in the `RateLimit-*` headers
+    legacyHeaders: false,
+    // Disable the `X-RateLimit-*` headers
+    message: {
+      error: "Too many requests from this IP. Please try again after 15 minutes."
+    }
+  });
+  app2.use("/api/", apiLimiter);
+}
+
+// server/middleware/errorHandler.ts
+function errorHandler(err, req, res, next) {
+  const statusCode = err.statusCode || 500;
+  const isProduction = process.env.NODE_ENV === "production";
+  console.error(`[Error Handler] ${req.method} ${req.url} - Status ${statusCode}:`, {
+    message: err.message,
+    code: err.code,
+    stack: isProduction ? void 0 : err.stack,
+    details: err.details
+  });
+  res.status(statusCode).json({
+    success: false,
+    error: err.message || "An unexpected error occurred on the server.",
+    code: err.code || "INTERNAL_SERVER_ERROR",
+    ...isProduction ? {} : { stack: err.stack, details: err.details }
+  });
+}
+
+// server/validators/index.ts
+var import_zod = require("zod");
+function validateBody(schema) {
+  return async (req, res, next) => {
+    try {
+      req.body = await schema.parseAsync(req.body);
+      next();
+    } catch (error) {
+      if (error instanceof import_zod.ZodError) {
+        return res.status(400).json({
+          success: false,
+          error: "Validation failed",
+          details: error.issues.map((err) => ({
+            field: err.path.join("."),
+            message: err.message
+          }))
+        });
+      }
+      next(error);
+    }
+  };
+}
+
+// server/validators/auth.ts
+var import_zod2 = require("zod");
+var registerSchema = import_zod2.z.object({
+  email: import_zod2.z.string().email({ message: "A valid email address is required." }),
+  password: import_zod2.z.string().min(8, { message: "Password must be at least 8 characters long." }),
+  phone_number: import_zod2.z.string().optional().refine((val) => {
+    if (!val) return true;
+    const cleanNum = val.trim().replace(/[\s-()]/g, "");
+    return /^\+?[1-9]\d{6,14}$/.test(cleanNum);
+  }, {
+    message: "Invalid phone number format. Please provide a valid number containing 7 to 15 digits."
+  })
+});
+var loginSchema = import_zod2.z.object({
+  email: import_zod2.z.string().email({ message: "A valid email address is required." }),
+  password: import_zod2.z.string().min(1, { message: "Password is required." })
+});
+
+// server/middleware/auth.ts
+var import_jsonwebtoken = __toESM(require("jsonwebtoken"), 1);
+var JWT_SECRET = process.env.JWT_SECRET || "default_jwt_secret_64_character_random_string_for_local_testing_only";
+function generateToken(payload) {
+  return import_jsonwebtoken.default.sign(
+    {
+      id: payload.id,
+      email: payload.email,
+      role: payload.role
+    },
+    JWT_SECRET,
+    {
+      expiresIn: "7d"
+    }
+  );
+}
+function requireRole(allowedRoles) {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ error: "Unauthorized: User authentication is required" });
+    }
+    const userRole = (req.user.role || "client").toLowerCase();
+    const isAllowed = allowedRoles.map((r) => r.toLowerCase()).includes(userRole);
+    if (!isAllowed) {
+      return res.status(403).json({
+        error: `Forbidden: This action is restricted to the following roles: [${allowedRoles.join(", ")}]. Current role: ${req.user.role}`
+      });
+    }
+    next();
+  };
+}
+var isAdmin = requireRole(["admin"]);
+var isModel = requireRole(["model"]);
+var isAgency = requireRole(["agency"]);
+var isUser = requireRole(["client", "admin", "model", "agency"]);
+
+// server/index.ts
+import_dotenv2.default.config();
+if (!globalThis.WebSocket) {
+  globalThis.WebSocket = import_ws.default;
+}
 var razorpayClient = null;
 function getRazorpay() {
   if (!razorpayClient) {
-    const keyId = process.env.RAZORPAY_KEY_ID;
-    const keySecret = process.env.RAZORPAY_KEY_SECRET;
-    if (!keyId || !keySecret || keyId.trim() === "" || keySecret.trim() === "") {
-      console.warn("RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET is not configured. Falling back to simulated/mock payments.");
+    const rawKeyId = process.env.RAZORPAY_KEY_ID;
+    const rawKeySecret = process.env.RAZORPAY_KEY_SECRET;
+    if (!rawKeyId || !rawKeySecret || rawKeyId.trim() === "" || rawKeySecret.trim() === "") {
+      console.warn("RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET is not configured in the environment. Falling back to simulated/mock payments.");
       return null;
     }
+    const keyId = rawKeyId.trim();
+    const keySecret = rawKeySecret.trim();
     try {
       razorpayClient = new import_razorpay.default({
         key_id: keyId,
         key_secret: keySecret
       });
-      console.log("Razorpay SDK client successfully initialized server-side.");
+      console.log("Razorpay SDK client successfully initialized server-side with key: " + keyId);
     } catch (e) {
       console.error("Failed to initialize Razorpay SDK:", e);
     }
@@ -56,7 +294,18 @@ function getRazorpay() {
   return razorpayClient;
 }
 var app = (0, import_express.default)();
-var PORT = 3e3;
+var PORT = Number(process.env.PORT) || 3e3;
+app.use((0, import_morgan.default)("combined"));
+setupSecurityMiddlewares(app);
+var pendingWebhookUnlocks = [];
+var verifiedChatAccess = /* @__PURE__ */ new Set([
+  "c1:m4",
+  "c1:m6",
+  "client:m4",
+  "client:m6",
+  "agency:m4",
+  "agency:m6"
+]);
 app.use(import_express.default.json({
   verify: (req, res, buf) => {
     req.rawBody = buf;
@@ -66,7 +315,14 @@ var geminiApiKey = process.env.GEMINI_API_KEY || "";
 var ai = null;
 if (geminiApiKey && geminiApiKey !== "MY_GEMINI_API_KEY") {
   try {
-    ai = new import_genai.GoogleGenAI({ apiKey: geminiApiKey });
+    ai = new import_genai.GoogleGenAI({
+      apiKey: geminiApiKey,
+      httpOptions: {
+        headers: {
+          "User-Agent": "aistudio-build"
+        }
+      }
+    });
     console.log("Gemini API successfully initialized server-side.");
   } catch (err) {
     console.error("Failed to initialize Gemini SDK", err);
@@ -75,7 +331,29 @@ if (geminiApiKey && geminiApiKey !== "MY_GEMINI_API_KEY") {
   console.warn("GEMINI_API_KEY missing or using placeholder, fallback response mode active.");
 }
 app.post("/api/chat/respond", async (req, res) => {
-  const { modelName, modelCategory, modelBiography, messages, userMessage } = req.body;
+  const { modelName, modelCategory, modelBiography, messages, userMessage, clientId, modelId } = req.body;
+  if (clientId && modelId) {
+    const key = `${clientId}:${modelId}`;
+    let isUnlocked = verifiedChatAccess.has(key);
+    if (!isUnlocked && isSupabaseConfigured && supabaseAdmin) {
+      try {
+        const { data: payRecord } = await supabaseAdmin.from("payments").select("id").eq("userId", clientId).eq("modelId", modelId).eq("status", "captured").maybeSingle();
+        if (payRecord) {
+          isUnlocked = true;
+          verifiedChatAccess.add(key);
+          console.log(`Verified persistent db payment for client:model ${key}. Cache updated.`);
+        }
+      } catch (err) {
+        console.error("Error checking database for payment verification:", err);
+      }
+    }
+    if (!isUnlocked) {
+      console.warn(`Unauthorized chat attempt detected for client key: ${key}`);
+      return res.status(403).json({
+        error: "Access Denied: Chat session is locked. Complete Razorpay payment verification first."
+      });
+    }
+  }
   const prompt = `You are ${modelName}, a professional model in India registered under ModelVerse India. 
 Your details:
 - Category: ${modelCategory}
@@ -153,7 +431,7 @@ app.post("/api/payments/create-session", async (req, res) => {
         id: order.id,
         amount: order.amount,
         currency: order.currency,
-        keyId: process.env.RAZORPAY_KEY_ID,
+        keyId: process.env.RAZORPAY_KEY_ID || "",
         isReal: true,
         isMock: false
       });
@@ -165,18 +443,46 @@ app.post("/api/payments/create-session", async (req, res) => {
   return res.json({ id: `mock_sess_${Date.now()}`, url: mockUrl, isMock: true });
 });
 app.post("/api/payments/verify", async (req, res) => {
-  const { gateway, sessionId, planType, amount, modelId, modelName, razorpay_payment_id, razorpay_order_id, razorpay_signature } = req.body;
+  const { gateway, sessionId, planType, amount, modelId, modelName, razorpay_payment_id, razorpay_order_id, razorpay_signature, userId, userName, userEmail } = req.body;
   if (gateway === "Razorpay" && razorpay_signature && razorpay_payment_id && razorpay_order_id) {
-    const secret = process.env.RAZORPAY_KEY_SECRET;
-    if (!secret) {
+    const rawSecret = process.env.RAZORPAY_KEY_SECRET;
+    if (!rawSecret || rawSecret.trim() === "") {
       return res.status(400).json({ error: "Razorpay secret key not configured on server." });
     }
+    const secret = rawSecret.trim();
     try {
       const body = razorpay_order_id + "|" + razorpay_payment_id;
       const expectedSignature = import_crypto.default.createHmac("sha256", secret).update(body).digest("hex");
       const isVerified = expectedSignature === razorpay_signature;
       if (isVerified) {
         console.log(`Real Razorpay payment verified: Order ${razorpay_order_id}, Payment ${razorpay_payment_id}`);
+        if (userId && modelId) {
+          verifiedChatAccess.add(`${userId}:${modelId}`);
+          console.log(`Chat access unlocked via verify: ${userId}:${modelId}`);
+        }
+        if (isSupabaseConfigured && supabaseAdmin) {
+          try {
+            const { error: dbError } = await supabaseAdmin.from("payments").insert({
+              id: razorpay_payment_id,
+              userId: userId || "anonymous_user",
+              userName: userName || "Razorpay Customer",
+              userEmail: userEmail || null,
+              amount: Number(amount) || 199,
+              paymentGateway: "Razorpay",
+              status: "captured",
+              description: `Verified Premium Chat Unlock for ${modelName || "Model"}`,
+              createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+              invoiceId: razorpay_order_id,
+              sessionId: razorpay_signature,
+              modelId: modelId || null,
+              modelName: modelName || null
+            });
+            if (dbError) throw dbError;
+            console.log("Successfully recorded verified Razorpay transaction in Supabase database.");
+          } catch (dbErr) {
+            console.error("Failed to save verified Razorpay transaction to database:", dbErr.message || dbErr);
+          }
+        }
         return res.json({
           verified: true,
           isMock: false,
@@ -201,6 +507,33 @@ app.post("/api/payments/verify", async (req, res) => {
     return res.status(400).json({ error: "Session ID is required for verification." });
   }
   console.log(`Verifying secure platform checkout session ${sessionId} via ${gateway || "Gateway"}.`);
+  if (userId && modelId) {
+    verifiedChatAccess.add(`${userId}:${modelId}`);
+    console.log(`Chat access unlocked via simulated verify: ${userId}:${modelId}`);
+  }
+  if (isSupabaseConfigured && supabaseAdmin) {
+    try {
+      const { error: dbError } = await supabaseAdmin.from("payments").insert({
+        id: sessionId,
+        userId: userId || "anonymous_user",
+        userName: userName || "Simulated Customer",
+        userEmail: userEmail || null,
+        amount: Number(amount) || 199,
+        paymentGateway: gateway || "Simulated Gateway",
+        status: "captured",
+        description: `Simulated Premium Chat Unlock for ${modelName || "Model"}`,
+        createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+        invoiceId: `mock_order_${Date.now()}`,
+        sessionId,
+        modelId: modelId || null,
+        modelName: modelName || null
+      });
+      if (dbError) throw dbError;
+      console.log("Successfully recorded simulated transaction in Supabase database.");
+    } catch (dbErr) {
+      console.error("Failed to save simulated transaction to database:", dbErr.message || dbErr);
+    }
+  }
   return res.json({
     verified: true,
     isMock: true,
@@ -211,6 +544,64 @@ app.post("/api/payments/verify", async (req, res) => {
     modelId: modelId || "",
     modelName: modelName || ""
   });
+});
+app.post("/api/payments/webhook", async (req, res) => {
+  const event = req.body;
+  console.log("Received Razorpay payment webhook event:", JSON.stringify(event));
+  if (event && (event.event === "payment.captured" || event.event === "order.paid")) {
+    const paymentEntity = event.payload?.payment?.entity || event.payload?.order?.entity || event;
+    const notes = paymentEntity.notes || {};
+    const planType = notes.planType || "premium";
+    const userId = notes.userId || "";
+    const modelId = notes.modelId || "";
+    const modelName = notes.modelName || "Model";
+    const amount = Number(notes.amount || (paymentEntity.amount ? paymentEntity.amount / 100 : 199));
+    if (userId && modelId) {
+      const webhookUnlock = {
+        id: `wh_pay_${Date.now()}_${Math.floor(Math.random() * 1e3)}`,
+        userId,
+        modelId,
+        modelName,
+        planType,
+        amount,
+        createdAt: (/* @__PURE__ */ new Date()).toISOString()
+      };
+      verifiedChatAccess.add(`${userId}:${modelId}`);
+      pendingWebhookUnlocks.push(webhookUnlock);
+      console.log("Successfully registered successful Razorpay webhook unlock:", webhookUnlock);
+    }
+  }
+  if (event && event.custom_webhook_success === true) {
+    const webhookUnlock = {
+      id: `wh_pay_${Date.now()}_${Math.floor(Math.random() * 1e3)}`,
+      userId: event.userId,
+      modelId: event.modelId,
+      modelName: event.modelName || "Model",
+      planType: event.planType || "premium",
+      amount: Number(event.amount || 199),
+      createdAt: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    if (event.userId && event.modelId) {
+      verifiedChatAccess.add(`${event.userId}:${event.modelId}`);
+    }
+    pendingWebhookUnlocks.push(webhookUnlock);
+    console.log("Successfully registered custom simulated payment webhook success:", webhookUnlock);
+  }
+  return res.json({ status: "ok", received: true });
+});
+app.get("/api/payments/pending-webhook-unlocks", (req, res) => {
+  const { userId } = req.query;
+  if (!userId) {
+    return res.status(400).json({ error: "userId parameter is required" });
+  }
+  const userUnlocks = pendingWebhookUnlocks.filter((item) => item.userId === userId);
+  for (const item of userUnlocks) {
+    const idx = pendingWebhookUnlocks.indexOf(item);
+    if (idx > -1) {
+      pendingWebhookUnlocks.splice(idx, 1);
+    }
+  }
+  return res.json({ unlocks: userUnlocks });
 });
 app.post("/api/talent/evaluate", async (req, res) => {
   const { name, category, age, height, city, experience, biography, languages } = req.body;
@@ -643,7 +1034,7 @@ app.post("/api/ai/image-edit", async (req, res) => {
   try {
     const cleanBase64 = base64Image.replace(/^data:image\/[a-z]+;base64,/, "");
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-image",
+      model: "gemini-3.1-flash-lite-image",
       contents: {
         parts: [
           {
@@ -826,11 +1217,11 @@ Structure your reply beautifully with markdown using sections like:
 - "5. Suggested Standard Indian Professional Casting Rate Safeguards"
 Keep details highly descriptive and upscale.`;
     const response = await ai.models.generateContent({
-      model: "gemini-3.1-pro-preview",
-      contents: [
-        { text: complexSystemInstruction },
-        { text: prompt || "Heritage elegance couture shoot in Rajasthan" }
-      ]
+      model: "gemini-3.5-flash",
+      contents: prompt || "Heritage elegance couture shoot in Rajasthan",
+      config: {
+        systemInstruction: complexSystemInstruction
+      }
     });
     return res.json({ success: true, response: response.text });
   } catch (err) {
@@ -846,7 +1237,7 @@ app.post("/api/ai/bio-enhancer", async (req, res) => {
   try {
     const prompt = `Rewrite this crude modeling biography to sound extremely upscale, elegant, couture, and professional (length exactly 40-55 words). Retain key facts but dress them in sleek, luxury, fashion-forward phrasing. Format: plain paragraph, no styling or markdown. Bio: "${bio || ""}"`;
     const response = await ai.models.generateContent({
-      model: "gemini-3.1-flash-lite",
+      model: "gemini-3.5-flash",
       contents: prompt
     });
     return res.json({ success: true, response: response.text?.trim() });
@@ -943,6 +1334,229 @@ app.get("/sitemap.xml", async (req, res) => {
     return res.status(500).send("Internal Server Error generating Sitemap");
   }
 });
+app.get("/api/supabase/status", (req, res) => {
+  return res.json({
+    isConfigured: isSupabaseConfigured,
+    url: process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL ? "Configured" : "Missing",
+    hasSecretKey: !!(process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY),
+    hasPublishableKey: !!(process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_API_KEY)
+  });
+});
+function validatePhoneNumber(phone) {
+  if (!phone) return false;
+  const phoneRegex = /^\+?[1-9]\d{6,14}$/;
+  return phoneRegex.test(phone.trim().replace(/[\s-()]/g, ""));
+}
+function generateSalt() {
+  return import_crypto.default.randomBytes(16).toString("hex");
+}
+function hashPassword(password, salt) {
+  return import_crypto.default.createHash("sha256").update(password + salt).digest("hex");
+}
+var LOCAL_USERS_FILE = import_path.default.join(process.cwd(), "local_hashed_users.json");
+function getLocalHashedUsers() {
+  try {
+    if (import_fs.default.existsSync(LOCAL_USERS_FILE)) {
+      return JSON.parse(import_fs.default.readFileSync(LOCAL_USERS_FILE, "utf8"));
+    }
+  } catch (e) {
+    console.error("Error reading local hashed users file:", e);
+  }
+  return [];
+}
+function saveLocalHashedUsers(users) {
+  try {
+    import_fs.default.writeFileSync(LOCAL_USERS_FILE, JSON.stringify(users, null, 2), "utf8");
+  } catch (e) {
+    console.error("Error writing local hashed users file:", e);
+  }
+}
+app.post("/api/auth/register-db", validateBody(registerSchema), async (req, res) => {
+  const { email, password, phone_number } = req.body;
+  const cleanEmail = email.trim().toLowerCase();
+  const salt = import_crypto.default.randomBytes(16).toString("hex");
+  const passwordHash = await import_bcrypt.default.hash(password, 12);
+  const userId = import_crypto.default.randomUUID();
+  if (isSupabaseConfigured && supabaseAdmin) {
+    try {
+      const { data: existingUser } = await supabaseAdmin.from("users").select("id").eq("email", cleanEmail).maybeSingle();
+      if (existingUser) {
+        return res.status(400).json({ error: "User with this email is already registered." });
+      }
+      const { data, error: insertError } = await supabaseAdmin.from("users").insert({
+        id: userId,
+        email: cleanEmail,
+        password_hash: passwordHash,
+        salt,
+        phone_number: phone_number || null,
+        created_at: (/* @__PURE__ */ new Date()).toISOString()
+      }).select().single();
+      if (insertError) {
+        throw insertError;
+      }
+      const token2 = generateToken({ id: userId, email: cleanEmail, role: "client" });
+      return res.status(201).json({
+        message: "User registered successfully in PostgreSQL database with secure Bcrypt 12-round hashing.",
+        token: token2,
+        user: {
+          id: userId,
+          email: cleanEmail,
+          phone_number: phone_number || null,
+          created_at: data.created_at
+        }
+      });
+    } catch (err) {
+      console.warn("[Supabase users fallback] Supabase insert failed, using fallback database:", err.message || err);
+    }
+  }
+  const localUsers = getLocalHashedUsers();
+  if (localUsers.find((u) => u.email === cleanEmail)) {
+    return res.status(400).json({ error: "User with this email is already registered." });
+  }
+  const newUser = {
+    id: userId,
+    email: cleanEmail,
+    password_hash: passwordHash,
+    salt,
+    phone_number: phone_number || null,
+    created_at: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  localUsers.push(newUser);
+  saveLocalHashedUsers(localUsers);
+  const token = generateToken({ id: userId, email: cleanEmail, role: "client" });
+  return res.status(201).json({
+    message: "User registered successfully in local-fallback mock database with secure Bcrypt 12-round hashing.",
+    token,
+    user: {
+      id: userId,
+      email: cleanEmail,
+      phone_number: phone_number || null,
+      created_at: newUser.created_at
+    }
+  });
+});
+app.post("/api/auth/login-db", validateBody(loginSchema), async (req, res) => {
+  const { email, password } = req.body;
+  const cleanEmail = email.trim().toLowerCase();
+  if (isSupabaseConfigured && supabaseAdmin) {
+    try {
+      const { data: user2 } = await supabaseAdmin.from("users").select("*").eq("email", cleanEmail).maybeSingle();
+      if (user2) {
+        let isPasswordCorrect = false;
+        try {
+          isPasswordCorrect = await import_bcrypt.default.compare(password, user2.password_hash);
+        } catch (err) {
+          isPasswordCorrect = false;
+        }
+        if (!isPasswordCorrect) {
+          const legacyHash = hashPassword(password, user2.salt);
+          if (legacyHash === user2.password_hash) {
+            isPasswordCorrect = true;
+            console.log(`Legacy user ${cleanEmail} authenticated successfully via SHA-256 fallback. Upgrading hash to Bcrypt...`);
+            const updatedBcryptHash = await import_bcrypt.default.hash(password, 12);
+            await supabaseAdmin.from("users").update({ password_hash: updatedBcryptHash }).eq("id", user2.id);
+          }
+        }
+        if (isPasswordCorrect) {
+          const token = generateToken({ id: user2.id, email: user2.email, role: "client" });
+          return res.json({
+            message: "Authentication successful. Login validated via secure hashed credentials.",
+            token,
+            user: {
+              id: user2.id,
+              email: user2.email,
+              phone_number: user2.phone_number,
+              created_at: user2.created_at
+            }
+          });
+        } else {
+          return res.status(401).json({ error: "Invalid email or password." });
+        }
+      }
+    } catch (err) {
+      console.warn("[Supabase users query fallback] Supabase login query failed, querying fallback database:", err.message || err);
+    }
+  }
+  const localUsers = getLocalHashedUsers();
+  const user = localUsers.find((u) => u.email === cleanEmail);
+  if (user) {
+    let isPasswordCorrect = false;
+    try {
+      isPasswordCorrect = await import_bcrypt.default.compare(password, user.password_hash);
+    } catch (err) {
+      isPasswordCorrect = false;
+    }
+    if (!isPasswordCorrect) {
+      const legacyHash = hashPassword(password, user.salt);
+      if (legacyHash === user.password_hash) {
+        isPasswordCorrect = true;
+        console.log(`Legacy fallback user ${cleanEmail} authenticated successfully. Upgrading to Bcrypt...`);
+        user.password_hash = await import_bcrypt.default.hash(password, 12);
+        saveLocalHashedUsers(localUsers);
+      }
+    }
+    if (isPasswordCorrect) {
+      const token = generateToken({ id: user.id, email: user.email, role: "client" });
+      return res.json({
+        message: "Authentication successful (fallback). Login validated via secure hashed credentials.",
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          phone_number: user.phone_number,
+          created_at: user.created_at
+        }
+      });
+    }
+  }
+  return res.status(401).json({ error: "Invalid email or password." });
+});
+app.post("/api/supabase/verify-token", async (req, res) => {
+  const { token } = req.body;
+  if (!token) {
+    return res.status(400).json({ error: "Token is required" });
+  }
+  if (!isSupabaseConfigured || !supabaseAdmin) {
+    return res.status(503).json({ error: "Supabase server-side client is not initialized" });
+  }
+  try {
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    if (error || !user) {
+      return res.status(401).json({ error: "Invalid or expired token", details: error?.message });
+    }
+    return res.json({ valid: true, user });
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to verify token", details: err.message });
+  }
+});
+app.get("/api/supabase/profile", requireSupabaseAuth, (req, res) => {
+  return res.json({
+    message: "Profile fetched securely from Supabase Server",
+    user: req.user
+  });
+});
+app.get("/api/supabase/users", requireSupabaseAuth, async (req, res) => {
+  if (!isSupabaseConfigured || !supabaseAdmin) {
+    return res.status(503).json({ error: "Supabase server-side client is not initialized" });
+  }
+  try {
+    const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers();
+    if (error) {
+      console.warn("Could not list users from auth admin, attempting public users table:", error.message);
+      const { data: publicUsers, error: publicError } = await supabaseAdmin.from("users").select("*");
+      if (publicError) {
+        return res.status(403).json({
+          error: "Forbidden: Elevate permissions using the service_role key to access admin functions",
+          details: publicError.message
+        });
+      }
+      return res.json({ source: "public_table", users: publicUsers });
+    }
+    return res.json({ source: "auth_admin", users });
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to retrieve users list", details: err.message });
+  }
+});
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", serverTime: (/* @__PURE__ */ new Date()).toISOString() });
 });
@@ -977,9 +1591,7 @@ wss.on("connection", async (clientWs, request) => {
         speechConfig: {
           voiceConfig: { prebuiltVoiceConfig: { voiceName } }
         },
-        systemInstruction: {
-          parts: [{ text: systemInstruction }]
-        }
+        systemInstruction
       },
       callbacks: {
         onmessage: (msg) => {
@@ -1026,7 +1638,37 @@ wss.on("connection", async (clientWs, request) => {
     clientWs.close();
   }
 });
+app.get(["/oauth-callback", "/oauth-callback/"], (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Authenticating...</title>
+    </head>
+    <body style="background-color: #121212; color: #ffffff; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0;">
+      <div style="text-align: center; padding: 20px;">
+        <p style="font-size: 18px; font-weight: bold; margin-bottom: 8px;">Authenticating with Google...</p>
+        <p style="font-size: 14px; color: #a0a0a0;">This window will close automatically once authentication is completed.</p>
+      </div>
+      <script>
+        console.log("OAuth popup callback loaded, hash:", window.location.hash);
+        if (window.opener) {
+          window.opener.postMessage({ 
+            type: 'OAUTH_AUTH_SUCCESS', 
+            hash: window.location.hash,
+            search: window.location.search
+          }, '*');
+          window.close();
+        } else {
+          window.location.href = '/';
+        }
+      </script>
+    </body>
+    </html>
+  `);
+});
 async function startServer() {
+  app.use(errorHandler);
   if (process.env.NODE_ENV !== "production") {
     const vite = await (0, import_vite.createServer)({
       server: { middlewareMode: true },
@@ -1043,12 +1685,19 @@ async function startServer() {
     console.log("Serving production build assets from /dist.");
   }
   server.on("upgrade", (request, socket, head) => {
-    const pathname = request.url ? new URL(request.url, `http://${request.headers.host || "localhost"}`).pathname : "";
-    if (pathname === "/api/live-audition") {
-      wss.handleUpgrade(request, socket, head, (ws) => {
-        wss.emit("connection", ws, request);
-      });
-    } else {
+    try {
+      const urlStr = request.url || "";
+      const pathname = urlStr.split("?")[0];
+      if (pathname === "/api/live-audition" || pathname.startsWith("/api/live-audition")) {
+        wss.handleUpgrade(request, socket, head, (ws) => {
+          wss.emit("connection", ws, request);
+        });
+      } else if (process.env.NODE_ENV !== "production") {
+      } else {
+        socket.destroy();
+      }
+    } catch (err) {
+      console.error("Upgrade routing error:", err);
       socket.destroy();
     }
   });
@@ -1057,6 +1706,12 @@ async function startServer() {
   });
 }
 startServer();
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  generateSalt,
+  hashPassword,
+  validatePhoneNumber
+});
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
