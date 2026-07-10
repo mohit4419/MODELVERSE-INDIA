@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <div align="center">
 <img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
 </div>
@@ -32,3 +33,7 @@ View your app in AI Studio: https://ai.studio/apps/68e1fcea-3a62-413a-94a6-0ea7b
    - `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY`
 4. Run the app:
    `npm run dev`
+=======
+# MODELVERSE-INDIA
+Discover top talent at ModelVerse India. We connect professional fashion, commercial, and acting models with premier casting opportunities across India."  Target Keywords: talent, modeling agency, fashion models, commercial models, India, casting.
+>>>>>>> a07250c23f4e9952c617003345b80888a5cbef86
