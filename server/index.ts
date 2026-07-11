@@ -1710,24 +1710,29 @@ app.get(['/oauth-callback', '/oauth-callback/'], (req: Request, res: Response) =
 
 
 async function startServer() {
+    
+    console.log("NODE_ENV =", process.env.NODE_ENV);
+    
   // Register secure centralized error handling middleware
   app.use(errorHandler);
 
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-    console.log('Vite middleware mounted in Development mode.');
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req: Request, res: Response) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
-    console.log('Serving production build assets from /dist.');
-  }
+ const isDev = process.env.NODE_ENV === "development";
+
+if (isDev) {
+  const vite = await createViteServer({
+    server: {
+      middlewareMode: true,
+    },
+  });
+
+  app.use(vite.middlewares);
+} else {
+  app.use(express.static(path.join(process.cwd(), "dist")));
+
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(process.cwd(), "dist", "index.html"));
+  });
+}
 
   // Bind WebSocket upgrade routing to port 3000
   server.on('upgrade', (request, socket, head) => {
